@@ -1,0 +1,46 @@
+[gd_scene format=3 uid="uid://byew251ie5dgp"]
+
+[ext_resource type="Script" uid="uid://o4lng4qohwu6" path="res://main.gd" id="1_1bvp3"]
+[ext_resource type="Texture2D" uid="uid://dfvei25sqsyhu" path="res://assets/kenney_cursor-pixel-pack/Tiles/tile_0073.png" id="1_h2yge"]
+[ext_resource type="Texture2D" uid="uid://dy6xkt656bhy6" path="res://assets/kenney_cursor-pixel-pack/Tiles/tile_0070.png" id="2_1bvp3"]
+[ext_resource type="Texture2D" uid="uid://buunt2veye12s" path="res://assets/kenney_cursor-pixel-pack/Tiles/tile_0072.png" id="3_lquwl"]
+[ext_resource type="AudioStream" uid="uid://dhdshxeanggin" path="res://assets/music/Newer Wave.mp3" id="5_lquwl"]
+
+[node name="Main" type="Node2D" unique_id=1161704820]
+script = ExtResource("1_1bvp3")
+bpm = 110.0
+timing_offset = -0.25
+
+[node name="Receptors" type="Node2D" parent="." unique_id=869917042]
+
+[node name="LeftTarget" type="Sprite2D" parent="Receptors" unique_id=372656992]
+modulate = Color(0, 0, 0, 1)
+texture_filter = 1
+position = Vector2(250, 500)
+scale = Vector2(5.625, 5.625)
+texture = ExtResource("1_h2yge")
+
+[node name="UpTarget" type="Sprite2D" parent="Receptors" unique_id=1616485926]
+modulate = Color(0, 0, 0, 1)
+texture_filter = 1
+position = Vector2(400, 500)
+scale = Vector2(5.625, 5.625)
+texture = ExtResource("2_1bvp3")
+
+[node name="RightTarget" type="Sprite2D" parent="Receptors" unique_id=99210218]
+modulate = Color(0, 0, 0, 1)
+texture_filter = 1
+position = Vector2(550, 500)
+scale = Vector2(5.625, 5.625)
+texture = ExtResource("3_lquwl")
+
+[node name="HUD" type="Label" parent="." unique_id=1933304128]
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 764.0
+offset_bottom = 149.0
+theme_override_font_sizes/font_size = 20
+text = "Score: 0"
+
+[node name="Music" type="AudioStreamPlayer" parent="." unique_id=1381596751]
+stream = ExtResource("5_lquwl")
