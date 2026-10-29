@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://d24unvguvrkkn"
-path="res://.godot/imported/DanceKingUp-1.png.png-ba5334d091880c593a2cea631504a77a.ctex"
+path="res://.godot/imported/DanceKingUp-1.png.png-bef8c2f13d55bda2a7eb431bc57552ac.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art_assets/DanceKing/DanceKingUp-1.png.png"
-dest_files=["res://.godot/imported/DanceKingUp-1.png.png-ba5334d091880c593a2cea631504a77a.ctex"]
+source_file="res://assets/character_assets/DanceKing/DanceKingUp-1.png.png"
+dest_files=["res://.godot/imported/DanceKingUp-1.png.png-bef8c2f13d55bda2a7eb431bc57552ac.ctex"]
 
 [params]
 
