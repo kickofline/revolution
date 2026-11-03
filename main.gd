@@ -118,7 +118,7 @@ func _process(_delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.echo:
 		return
-	if event.is_action_pressed("restart_song"):
+	if event.is_action_pressed("restart"):
 		_start_run()
 		get_viewport().set_input_as_handled()
 		return
@@ -148,7 +148,7 @@ func _judge(lane: int) -> void:
 		return
 
 	if closest_distance <= PERFECT_WINDOW:
-		score += 10000000
+		score += 1000
 		feedback = "Perfect"
 	else:
 		score += 500
@@ -175,4 +175,4 @@ func _finish_run(message: String) -> void:
 
 func _on_music_finished() -> void:
 	if running:
-		_finish_run("Audio ended before the chart cleared. Check its length; R restarts.")
+		_finish_run("song over.")

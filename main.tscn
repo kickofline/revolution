@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://dy6xkt656bhy6" path="res://assets/kenney_cursor-pixel-pack/Tiles/tile_0070.png" id="2_1bvp3"]
 [ext_resource type="Texture2D" uid="uid://buunt2veye12s" path="res://assets/kenney_cursor-pixel-pack/Tiles/tile_0072.png" id="3_lquwl"]
 [ext_resource type="AudioStream" uid="uid://dhdshxeanggin" path="res://assets/music/Newer Wave.mp3" id="5_lquwl"]
+[ext_resource type="Script" uid="uid://2aijkgxpua0v" path="res://front_end.gd" id="6_7mycd"]
 
 [node name="Main" type="Node2D" unique_id=1161704820]
 script = ExtResource("1_1bvp3")
@@ -44,3 +45,148 @@ text = "Score: 0"
 
 [node name="Music" type="AudioStreamPlayer" parent="." unique_id=1381596751]
 stream = ExtResource("5_lquwl")
+
+[node name="MenuLayer" type="CanvasLayer" parent="." unique_id=1657722162]
+layer = 10
+
+[node name="FrontEnd" type="Control" parent="MenuLayer" unique_id=2109584001]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("6_7mycd")
+
+[node name="Backdrop" type="ColorRect" parent="MenuLayer/FrontEnd" unique_id=1535223841]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.0627451, 0.08235294, 0.13333334, 1)
+
+[node name="StartPanel" type="PanelContainer" parent="MenuLayer/FrontEnd" unique_id=951440504]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -200.0
+offset_right = 220.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="MenuLayer/FrontEnd/StartPanel" unique_id=662378566]
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="Title" type="Label" parent="MenuLayer/FrontEnd/StartPanel/Content" unique_id=751142744]
+layout_mode = 2
+text = "game name"
+horizontal_alignment = 1
+
+[node name="Subtitle" type="Label" parent="MenuLayer/FrontEnd/StartPanel/Content" unique_id=166665782]
+layout_mode = 2
+text = "Hit Left, Up, or Right when an arrow reaches its target."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="PlayButton" type="Button" parent="MenuLayer/FrontEnd/StartPanel/Content" unique_id=2107418796]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Choose a level"
+
+[node name="LevelPanel" type="PanelContainer" parent="MenuLayer/FrontEnd" unique_id=1815325007]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -200.0
+offset_right = 220.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="MenuLayer/FrontEnd/LevelPanel" unique_id=1630459954]
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="Title" type="Label" parent="MenuLayer/FrontEnd/LevelPanel/Content" unique_id=1065676709]
+layout_mode = 2
+text = "Choose a level"
+horizontal_alignment = 1
+
+[node name="LevelPicker" type="OptionButton" parent="MenuLayer/FrontEnd/LevelPanel/Content" unique_id=609258049]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+
+[node name="Description" type="Label" parent="MenuLayer/FrontEnd/LevelPanel/Content" unique_id=1249756313]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="PlayButton" type="Button" parent="MenuLayer/FrontEnd/LevelPanel/Content" unique_id=2135936388]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Play"
+
+[node name="BackButton" type="Button" parent="MenuLayer/FrontEnd/LevelPanel/Content" unique_id=709966232]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Back"
+
+[node name="ResultsPanel" type="PanelContainer" parent="MenuLayer/FrontEnd" unique_id=1510826775]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -200.0
+offset_right = 220.0
+offset_bottom = 200.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="MenuLayer/FrontEnd/ResultsPanel" unique_id=1774043019]
+layout_mode = 2
+theme_override_constants/separation = 14
+alignment = 1
+
+[node name="Title" type="Label" parent="MenuLayer/FrontEnd/ResultsPanel/Content" unique_id=2127678025]
+layout_mode = 2
+text = "Results"
+horizontal_alignment = 1
+
+[node name="Summary" type="Label" parent="MenuLayer/FrontEnd/ResultsPanel/Content" unique_id=1932228807]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 2
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="RetryButton" type="Button" parent="MenuLayer/FrontEnd/ResultsPanel/Content" unique_id=1245715898]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Retry"
+
+[node name="LevelsButton" type="Button" parent="MenuLayer/FrontEnd/ResultsPanel/Content" unique_id=714706782]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Level select"
+
+[node name="MenuButton" type="Button" parent="MenuLayer/FrontEnd/ResultsPanel/Content" unique_id=120232889]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Main menu"
