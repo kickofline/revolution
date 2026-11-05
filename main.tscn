@@ -6,11 +6,10 @@
 [ext_resource type="Texture2D" uid="uid://buunt2veye12s" path="res://assets/kenney_cursor-pixel-pack/Tiles/tile_0072.png" id="3_lquwl"]
 [ext_resource type="AudioStream" uid="uid://dhdshxeanggin" path="res://assets/music/Newer Wave.mp3" id="5_lquwl"]
 [ext_resource type="Script" uid="uid://2aijkgxpua0v" path="res://front_end.gd" id="6_7mycd"]
+[ext_resource type="Script" uid="uid://boqdd6p2ie824" path="res://feedback.gd" id="7_272bh"]
 
 [node name="Main" type="Node2D" unique_id=1161704820]
 script = ExtResource("1_1bvp3")
-bpm = 110.0
-timing_offset = -0.25
 
 [node name="Receptors" type="Node2D" parent="." unique_id=869917042]
 
@@ -190,3 +189,7 @@ text = "Level select"
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 text = "Main menu"
+
+[node name="Feedback" type="Node2D" parent="." unique_id=2003996119]
+z_index = 20
+script = ExtResource("7_272bh")
