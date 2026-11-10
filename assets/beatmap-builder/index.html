@@ -91,6 +91,7 @@
     <label class="ctl">Beats/bar <select id="meter"><option>3</option><option selected>4</option></select></label>
     <button id="shiftBtn" title="Move the bar start by one beat">Shift bar start</button>
     <label class="ctl" title="First arrow can't be earlier than this, so it falls from the top of the screen (game LEAD_TIME is 1.85 s)">Earliest arrow (s) <input id="minFirst" type="number" step="0.05" min="0" value="2.0"></label>
+    <label class="ctl" title="Level length in beats, counting first_hit as beat 1. The game ends 1.5 s after the last beat, fading the music. Blank = whole song.">max_beats <input id="maxBeats" type="number" step="1" min="1" placeholder="whole song"></label>
   </div>
   <div class="bar">
     <button id="playBtn" class="primary">▶ Play</button>
@@ -153,7 +154,7 @@
 const LANES = 3;
 const LANE_GLYPH = ['←', '↑', '→'];
 const LANE_COLOR = ['#ff5d8f', '#5dd6ff', '#ffd35d'];
-const GAME = { LEAD_TIME: 1.85, PERFECT: 0.060, GOOD: 0.150, FALL: 300, HIT_Y: 500, VIEW_H: 600 };
+const GAME = { LEAD_TIME: 1.85, PERFECT: 0.060, GOOD: 0.150, FALL: 300, HIT_Y: 500, VIEW_H: 600, END_PAD: 1.5 };
 const BPM_HINTS = { // from revolution/assets/music/BPM.txt
   'burn the world waltz': 177, 'cloud dancer': 214, 'neon laser horizon': 160, 'newer wave': 110, 'realizer': 125
 };
@@ -365,9 +366,13 @@ function downbeatFor(an, bpm, firstBeat, m) {
 
 // ---------------- map generation ----------------
 function chartWindow(an, p) {
+  const spb = 60 / p.bpm;
   const tStart = Math.max(p.minFirst, an.musicStart - 0.02);
-  const tEnd = Math.min(an.musicEnd, an.dur) - 0.5;
-  return { tStart, tEnd };
+  const firstHit = p.firstBeat + Math.ceil((tStart - p.firstBeat) / spb - 1e-6) * spb;
+  let tEnd = Math.min(an.musicEnd, an.dur) - 0.5;
+  let lastBeat = null; // game ends END_PAD after this beat
+  if (p.maxBeats > 0) { lastBeat = firstHit + (p.maxBeats - 1) * spb; tEnd = Math.min(tEnd, lastBeat + 0.005); }
+  return { tStart, tEnd, firstHit, lastBeat };
 }
 
 function generateMap(an, p) {
@@ -465,24 +470,26 @@ function advance(st, l, t) { st.prev = st.last; st.last = l; st.lastT = t; if (l
 
 function levelVars(an, p, notes) {
   const spb = 60 / p.bpm, cfg = DIFF[p.difficulty];
-  const { tStart, tEnd } = chartWindow(an, p);
-  const firstHit = p.firstBeat + Math.ceil((tStart - p.firstBeat) / spb - 1e-6) * spb;
+  const { tEnd, firstHit } = chartWindow(an, p);
   const beatStep = cfg.step(p.bpm);
   const noteCount = Math.max(1, Math.floor((tEnd - firstHit) / (spb * beatStep)) + 1);
   const pattern = [];
   for (let i = 0; i < notes.length && pattern.length < 8; i++) if (i === 0 || notes[i].t !== notes[i - 1].t) pattern.push(notes[i].lane);
-  return { bpm: p.bpm, firstHit, beatStep, noteCount, pattern: pattern.length ? pattern : [0, 1, 2], offset: p.offset };
+  const maxBeats = p.maxBeats > 0 ? p.maxBeats : 0;
+  const lastBeat = maxBeats ? firstHit + (maxBeats - 1) * spb : (notes.at(-1)?.t ?? firstHit);
+  return { bpm: p.bpm, firstHit, beatStep, noteCount, pattern: pattern.length ? pattern : [0, 1, 2], offset: p.offset,
+    maxBeats, endTime: lastBeat + GAME.END_PAD };
 }
 
 // ======================= app state =======================
 const S = {
   name: '', buffer: null, an: null,
-  bpm: 120, firstBeat: 0, beatsPerBar: 4, downbeat: 0, offset: 0, minFirst: 2.0,
+  bpm: 120, firstBeat: 0, beatsPerBar: 4, downbeat: 0, offset: 0, minFirst: 2.0, maxBeats: 0,
   difficulty: 'normal', density: 1, seed: 1, bpmHint: null,
   notes: [], sel: null, undo: [], redo: [],
 };
 const params = () => ({ bpm: S.bpm, firstBeat: S.firstBeat, beatsPerBar: S.beatsPerBar, downbeat: S.downbeat,
-  difficulty: S.difficulty, density: S.density, seed: S.seed, minFirst: S.minFirst, offset: S.offset });
+  difficulty: S.difficulty, density: S.density, seed: S.seed, minFirst: S.minFirst, offset: S.offset, maxBeats: S.maxBeats });
 
 const $ = s => document.querySelector(s);
 let actx = null;
@@ -540,6 +547,7 @@ function syncInputs() {
   $('#meter').value = String(S.beatsPerBar);
   $('#offset').value = S.offset.toFixed(3);
   $('#minFirst').value = S.minFirst;
+  $('#maxBeats').value = S.maxBeats || '';
   $('#diff').value = S.difficulty;
 }
 
@@ -562,6 +570,9 @@ function updateOutputs() {
     ['beat_step', fmt(v.beatStep, 2), 'Formula fallback spacing, in beats.'],
     ['pattern', '[' + v.pattern.join(', ') + ']', 'Formula fallback: the first lanes of the real map.'],
     ['notes', String(S.notes.length), `${(S.notes.length / dur).toFixed(2)} arrows per second on average.`],
+    ['max_beats', v.maxBeats ? String(v.maxBeats) : '—', v.maxBeats
+      ? `Level ends on beat ${v.maxBeats} (${fmt(v.endTime - GAME.END_PAD, 2)} s), music fades out, results at ${fmt(v.endTime, 2)} s.`
+      : `Not set: whole song. Results ${GAME.END_PAD} s after the last arrow (${fmt(v.endTime, 2)} s).`],
     ['first beat', fmt(S.firstBeat) + ' s', `Beat grid start. Bars of ${S.beatsPerBar}, bar starts on beat ${S.downbeat + 1}.`],
     ['music', `${fmt(an.musicStart, 2)}–${fmt(an.musicEnd, 2)} s`, `Song file is ${fmt(an.dur, 2)} s. Last arrow at ${fmt(S.notes.at(-1)?.t ?? 0, 2)} s.`],
   ];
@@ -581,7 +592,7 @@ function levelText(v) {
 \t\t"description": "${Math.round(v.bpm)} bpm · ${DIFF[S.difficulty].label}",
 \t\t"stream": preload("res://assets/music/${S.name}"),
 \t\t"bpm": ${gdFloat(v.bpm, 2)}, "first_hit": ${gdFloat(v.firstHit)}, "offset": ${gdFloat(v.offset)},
-\t\t"note_count": ${v.noteCount}, "beat_step": ${gdFloat(v.beatStep, 2)},
+\t\t"note_count": ${v.noteCount}, "beat_step": ${gdFloat(v.beatStep, 2)},${v.maxBeats ? ` "max_beats": ${v.maxBeats},` : ''}
 \t\t"pattern": [${v.pattern.join(', ')}],
 \t\t"notes": [
 ${lines.join(',\n')}
@@ -595,7 +606,7 @@ function mapJSON() {
     format: 'revolution-beatmap/1', song: S.name, stream: 'res://assets/music/' + S.name, title: $('#title').value,
     difficulty: S.difficulty, bpm: +v.bpm.toFixed(4), first_beat: +S.firstBeat.toFixed(4), beats_per_bar: S.beatsPerBar,
     downbeat: S.downbeat, first_hit: +v.firstHit.toFixed(4), offset: S.offset, note_count: v.noteCount, beat_step: v.beatStep,
-    pattern: v.pattern, min_first: S.minFirst, notes: S.notes.map(n => [+n.t.toFixed(4), n.lane]),
+    pattern: v.pattern, min_first: S.minFirst, ...(v.maxBeats ? { max_beats: v.maxBeats } : {}), notes: S.notes.map(n => [+n.t.toFixed(4), n.lane]),
   }, null, 1);
 }
 
@@ -606,7 +617,7 @@ function loadMap(text) {
   if (j.song && j.song !== S.name) status(`Note: this map was made for "${j.song}", but "${S.name}" is open.`);
   Object.assign(S, {
     bpm: j.bpm ?? S.bpm, firstBeat: j.first_beat ?? S.firstBeat, beatsPerBar: j.beats_per_bar ?? S.beatsPerBar,
-    downbeat: j.downbeat ?? S.downbeat, offset: j.offset ?? 0, minFirst: j.min_first ?? S.minFirst,
+    downbeat: j.downbeat ?? S.downbeat, offset: j.offset ?? 0, minFirst: j.min_first ?? S.minFirst, maxBeats: j.max_beats ?? 0,
     difficulty: DIFF[j.difficulty] ? j.difficulty : S.difficulty,
     notes: j.notes.map(([t, lane]) => ({ t: +t, lane: Math.max(0, Math.min(2, lane | 0)) })).sort((a, b) => a.t - b.t),
   });
@@ -761,7 +772,9 @@ function drawTimeline() {
   const mark = (t, color, label) => { const x = xOf(t); if (x < -50 || x > W + 50) return; c.fillStyle = color; c.fillRect(Math.round(x), TL.ruler, 2, TL.wave); c.fillText(label, x + 4, TL.ruler + 2); };
   mark(an.musicStart, '#5ee6a0', 'music');
   mark(v.firstHit, '#ffb86b', 'first_hit');
-  mark(an.musicEnd, '#ff6b7f', 'end');
+  mark(an.musicEnd, '#ff6b7f', 'music end');
+  if (v.maxBeats) { mark(v.endTime - GAME.END_PAD, '#ff6b7f', 'last beat'); mark(v.endTime, '#ff6b7f', 'level end');
+    const xe = xOf(v.endTime); if (xe < W) { c.fillStyle = 'rgba(0,0,0,.55)'; c.fillRect(Math.max(0, xe), TL.ruler, W, H - TL.ruler); } }
   // lane labels
   c.font = 'bold 18px system-ui'; c.textBaseline = 'middle';
   // notes
@@ -924,6 +937,7 @@ $('#dblBtn').onclick = () => refit(S.bpm * 2, 0.003);
 $('#meter').onchange = e => { pushUndo(); S.beatsPerBar = +e.target.value; S.downbeat = downbeatFor(S.an, S.bpm, S.firstBeat, S.beatsPerBar); S.notes = generateMap(S.an, params()); changed(); };
 $('#shiftBtn').onclick = () => { pushUndo(); S.downbeat = (S.downbeat + 1) % S.beatsPerBar; S.notes = generateMap(S.an, params()); changed(); };
 $('#minFirst').onchange = e => { S.minFirst = Math.max(0, +e.target.value || 0); regenerate(); };
+$('#maxBeats').onchange = e => { S.maxBeats = Math.max(0, Math.round(+e.target.value || 0)); regenerate(); };
 $('#offset').onchange = e => { S.offset = +e.target.value || 0; changed(); };
 $('#title').oninput = changed;
 $('#playBtn').onclick = toggle;
