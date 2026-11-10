@@ -1,0 +1,970 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Beat Map Builder · Revolution</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #12131a; --panel: #1b1d27; --panel2: #232634; --line: #2f3345;
+    --text: #e8e9f0; --dim: #9a9fb5; --accent: #8b7bff; --good: #5ee6a0; --warn: #ffb86b; --bad: #ff6b7f;
+    --l0: #ff5d8f; --l1: #5dd6ff; --l2: #ffd35d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0 8px 0 0; letter-spacing: .3px; }
+  header h1 span { color: var(--accent); }
+  #songName { font-weight: 600; }
+  #status { color: var(--dim); margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  progress { width: 140px; height: 8px; }
+  button, select, input[type=number] {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px;
+    padding: 6px 10px; font: inherit; min-height: 32px;
+  }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.on { background: #3a2f7a; border-color: var(--accent); }
+  input[type=number] { width: 84px; }
+  label.ctl { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; flex-wrap: wrap; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .sep { width: 1px; height: 24px; background: var(--line); }
+  #drop { margin: 40px auto; max-width: 640px; padding: 48px 24px; text-align: center; border: 2px dashed var(--line); border-radius: 14px; color: var(--dim); }
+  #drop.hot { border-color: var(--accent); color: var(--text); }
+  #drop h2 { color: var(--text); margin: 0 0 8px; }
+  #app.hidden, #drop.hidden { display: none; }
+  #tlWrap { padding: 8px 16px 0; }
+  #timeline { width: 100%; height: 270px; display: block; background: #0d0e14; border: 1px solid var(--line); border-radius: 8px; cursor: crosshair; }
+  #scroll { width: 100%; margin: 6px 0 0; }
+  .hint { color: var(--dim); font-size: 12px; }
+  .grid { display: grid; grid-template-columns: 320px 1fr 1.2fr; gap: 14px; padding: 12px 16px 24px; }
+  @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .card h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--dim); }
+  #preview { width: 100%; aspect-ratio: 3 / 4; display: block; background: #0d0e14; border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 5px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:first-child { font-family: Consolas, monospace; color: var(--accent); white-space: nowrap; }
+  td:nth-child(2) { font-family: Consolas, monospace; font-weight: 600; white-space: nowrap; }
+  td:nth-child(3) { color: var(--dim); font-size: 12px; }
+  textarea { width: 100%; height: 230px; background: #0d0e14; color: #cfd3ff; border: 1px solid var(--line); border-radius: 8px; font: 12px/1.45 Consolas, monospace; padding: 8px; resize: vertical; tab-size: 4; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+  #testStats { margin-top: 8px; font-family: Consolas, monospace; font-size: 12px; color: var(--dim); min-height: 36px; }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; color: var(--dim); }
+  pre { background: #0d0e14; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font: 12px/1.45 Consolas, monospace; overflow-x: auto; color: #cfd3ff; tab-size: 4; }
+  .warn { color: var(--warn); }
+  kbd { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Beat Map <span>Builder</span></h1>
+  <button id="openBtn" class="primary">Open song…</button>
+  <input id="fileIn" type="file" accept="audio/*,.mp3,.ogg,.wav" hidden>
+  <button id="loadMapBtn" disabled>Load map .json…</button>
+  <input id="mapIn" type="file" accept=".json,application/json" hidden>
+  <span id="songName"></span>
+  <span id="status"><span id="statusText">Open an MP3 from revolution/assets/music to start.</span><progress id="prog" max="1" value="0" hidden></progress></span>
+</header>
+
+<div id="drop">
+  <h2>Drop a song here</h2>
+  <p>Or use <b>Open song…</b>. The tool listens to the track, finds the tempo, the first beat and the real hits,
+  then builds a 3-lane (← ↑ →) arrow map you can edit, preview, and paste into <code>main.gd</code>.</p>
+  <p class="hint">Everything runs in this page. Nothing is uploaded.</p>
+</div>
+
+<div id="app" class="hidden">
+  <div class="bar">
+    <label class="ctl">Difficulty
+      <select id="diff"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select>
+    </label>
+    <label class="ctl">Density <input id="density" type="range" min="0.5" max="1.6" step="0.05" value="1"> <span id="densityVal">1.00×</span></label>
+    <button id="regenBtn" title="New random lane choices, same timing rules">🎲 Regenerate</button>
+    <div class="sep"></div>
+    <label class="ctl">BPM <input id="bpm" type="number" step="0.01" min="40" max="300"></label>
+    <button id="halfBtn" title="Half tempo">½×</button>
+    <button id="dblBtn" title="Double tempo">2×</button>
+    <label class="ctl">Beats/bar <select id="meter"><option>3</option><option selected>4</option></select></label>
+    <button id="shiftBtn" title="Move the bar start by one beat">Shift bar start</button>
+    <label class="ctl" title="First arrow can't be earlier than this, so it falls from the top of the screen (game LEAD_TIME is 1.85 s)">Earliest arrow (s) <input id="minFirst" type="number" step="0.05" min="0" value="2.0"></label>
+  </div>
+  <div class="bar">
+    <button id="playBtn" class="primary">▶ Play</button>
+    <button id="stopBtn">■ Stop</button>
+    <label class="ctl"><input id="clicks" type="checkbox" checked> Hit sounds</label>
+    <button id="testBtn" title="Play with the arrow keys and measure your timing">🎮 Play test</button>
+    <span id="timeText" class="hint" style="font-family:Consolas,monospace"></span>
+    <div class="sep"></div>
+    <label class="ctl">Snap <select id="snap"><option value="1">1/1 beat</option><option value="2">1/2</option><option value="4" selected>1/4</option><option value="0">off</option></select></label>
+    <label class="ctl">Zoom <input id="zoom" type="range" min="15" max="600" value="140"></label>
+    <span class="hint">Click a lane to add · drag to move · right-click or <kbd>Del</kbd> to delete · <kbd>Space</kbd> play · <kbd>Ctrl+Z</kbd> undo</span>
+  </div>
+  <div id="tlWrap">
+    <canvas id="timeline"></canvas>
+    <input id="scroll" type="range" min="0" max="1000" value="0" step="1">
+  </div>
+  <div class="grid">
+    <div class="card">
+      <h3>Game preview</h3>
+      <canvas id="preview" width="300" height="400"></canvas>
+      <div id="testStats"></div>
+      <div class="row"><button id="applyOffsetBtn" hidden>Use suggested offset</button></div>
+    </div>
+    <div class="card">
+      <h3>Level variables (calculated)</h3>
+      <table id="vars"></table>
+      <div class="row" style="margin-top:10px">
+        <label class="ctl" title="Added to the song clock in the game. 0 means arrows land exactly on the audio.">offset <input id="offset" type="number" step="0.005" value="0"></label>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Export</h3>
+      <div class="hint">Paste this into the <code>LEVELS</code> array in <code>main.gd</code>. Until the game reads <code>"notes"</code>, it uses the calculated <code>bpm</code> / <code>first_hit</code> / <code>note_count</code> / <code>pattern</code> instead.</div>
+      <div class="row">
+        <label class="ctl">Title <input id="title" type="text" style="background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px;width:220px"></label>
+      </div>
+      <textarea id="out" readonly spellcheck="false"></textarea>
+      <div class="row">
+        <button id="copyBtn" class="primary">Copy level entry</button>
+        <button id="saveBtn">Download map .json</button>
+      </div>
+      <details>
+        <summary>Game change needed to use the full beat map</summary>
+        <p class="hint">In <code>main.gd</code>, start <code>_build_chart</code> like this. Levels without <code>"notes"</code> keep working as before.</p>
+<pre>func _build_chart(level: Dictionary) -> void:
+	chart.clear()
+	if level.has("notes"):
+		for n in level["notes"]:
+			chart.append({"time": float(n[0]), "lane": int(n[1])})
+		return
+	# ...existing formula code stays below...</pre>
+      </details>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ======================= constants =======================
+const LANES = 3;
+const LANE_GLYPH = ['←', '↑', '→'];
+const LANE_COLOR = ['#ff5d8f', '#5dd6ff', '#ffd35d'];
+const GAME = { LEAD_TIME: 1.85, PERFECT: 0.060, GOOD: 0.150, FALL: 300, HIT_Y: 500, VIEW_H: 600 };
+const BPM_HINTS = { // from revolution/assets/music/BPM.txt
+  'burn the world waltz': 177, 'cloud dancer': 214, 'neon laser horizon': 160, 'newer wave': 110, 'realizer': 125
+};
+const DIFF = {
+  easy:   { label: 'Easy',   subs: [0],          nps: 1.3, gap: 0.42,  chords: false, step: b => b > 150 ? 2 : 1 },
+  normal: { label: 'Normal', subs: [0, 2],       nps: 2.3, gap: 0.21,  chords: false, step: () => 1 },
+  hard:   { label: 'Hard',   subs: [0, 1, 2, 3], nps: 3.6, gap: 0.125, chords: true,  step: b => b <= 130 ? 0.5 : 1 },
+};
+const STRENGTH_FLOOR = 0.12;
+
+// ======================= analysis (pure) =======================
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+function makeFFT(n) {
+  const cos = new Float64Array(n / 2), sin = new Float64Array(n / 2);
+  for (let i = 0; i < n / 2; i++) { cos[i] = Math.cos(-2 * Math.PI * i / n); sin[i] = Math.sin(-2 * Math.PI * i / n); }
+  const rev = new Uint32Array(n);
+  for (let i = 0, j = 0; i < n; i++) { rev[i] = j; let bit = n >> 1; while (j & bit) { j ^= bit; bit >>= 1; } j |= bit; }
+  return function fft(re, im) {
+    for (let i = 0; i < n; i++) { const j = rev[i]; if (i < j) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+    for (let len = 2; len <= n; len <<= 1) {
+      const half = len >> 1, step = n / len;
+      for (let i = 0; i < n; i += len) {
+        for (let k = 0; k < half; k++) {
+          const a = i + k, b = a + half, wr = cos[k * step], wi = sin[k * step];
+          const tr = re[b] * wr - im[b] * wi, ti = re[b] * wi + im[b] * wr;
+          re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+        }
+      }
+    }
+  };
+}
+
+function percentile(arr, p) {
+  const c = Float32Array.from(arr).sort();
+  return c[Math.min(c.length - 1, Math.max(0, Math.floor(p * (c.length - 1))))] || 0;
+}
+
+function interp(a, f) {
+  if (f < 0 || f >= a.length - 1) return 0;
+  const i = f | 0, u = f - i; return a[i] * (1 - u) + a[i + 1] * u;
+}
+
+function normEnv(a, fps) {
+  const n = a.length, w = Math.round(0.3 * fps), ps = new Float64Array(n + 1);
+  for (let i = 0; i < n; i++) ps[i + 1] = ps[i] + a[i];
+  const out = new Float32Array(n);
+  let mx = 0;
+  for (let i = 0; i < n; i++) {
+    const lo = Math.max(0, i - w), hi = Math.min(n, i + w + 1);
+    out[i] = Math.max(0, a[i] - (ps[hi] - ps[lo]) / (hi - lo));
+    if (out[i] > mx) mx = out[i];
+  }
+  const p = Math.max(percentile(out, 0.98), mx * 0.05, 1e-9);
+  for (let i = 0; i < n; i++) out[i] = Math.min(1.5, out[i] / p);
+  return out;
+}
+
+async function analyze(x, sr, prog) {
+  const N = 2048, hop = Math.round(sr / 100), fps = sr / hop, tOff = N / 2 / sr;
+  const nF = Math.max(2, Math.floor((x.length - N) / hop) + 1);
+  const fft = makeFFT(N), win = new Float32Array(N);
+  for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1));
+  const bandHz = [[30, 150], [150, 2500], [2500, 11000]];
+  const bands = bandHz.map(([a, b]) => [Math.max(1, Math.floor(a * N / sr)), Math.min(N / 2 - 1, Math.ceil(b * N / sr))]);
+  const flux = bands.map(() => new Float32Array(nF));
+  const re = new Float64Array(N), im = new Float64Array(N);
+  let prev = new Float32Array(N / 2), cur = new Float32Array(N / 2);
+  for (let f = 0; f < nF; f++) {
+    const off = f * hop;
+    for (let i = 0; i < N; i++) { re[i] = (x[off + i] || 0) * win[i]; im[i] = 0; }
+    fft(re, im);
+    for (let k = 0; k < N / 2; k++) cur[k] = Math.log1p(10 * Math.hypot(re[k], im[k]));
+    if (f > 0) for (let b = 0; b < bands.length; b++) {
+      let s = 0; const [lo, hi] = bands[b];
+      for (let k = lo; k <= hi; k++) { const d = cur[k] - prev[k]; if (d > 0) s += d; }
+      flux[b][f] = s / (hi - lo + 1);
+    }
+    const t = prev; prev = cur; cur = t;
+    if (f % 300 === 0 && prog) await prog(f / nF);
+  }
+  // waveform + loudness per 10 ms chunk (time = j / fps)
+  const nW = Math.ceil(x.length / hop), wave = new Float32Array(nW), rms = new Float32Array(nW);
+  for (let j = 0; j < nW; j++) {
+    let m = 0, s = 0; const a = j * hop, b = Math.min(x.length, a + hop);
+    for (let i = a; i < b; i++) { const v = x[i]; s += v * v; const av = v < 0 ? -v : v; if (av > m) m = av; }
+    wave[j] = m; rms[j] = Math.sqrt(s / Math.max(1, b - a));
+  }
+  const env = flux.map(f => normEnv(f, fps));
+  const comb = new Float32Array(nF);
+  for (let i = 1; i < nF - 1; i++) {
+    const v = k => env[0][k] + env[1][k] + 0.6 * env[2][k];
+    comb[i] = (0.25 * v(i - 1) + 0.5 * v(i) + 0.25 * v(i + 1)) / 2.6;
+  }
+  const maxR = rms.reduce((a, b) => Math.max(a, b), 0) || 1;
+  let ms = 0, me = nW - 1;
+  while (ms < nW - 1 && rms[ms] < maxR * 0.03) ms++;
+  while (me > ms && rms[me] < maxR * 0.03) me--;
+  const musicRms = rms.slice(ms, me + 1);
+  return {
+    sr, hop, fps, tOff, nF, env, comb, wave, rms, dur: x.length / sr,
+    musicStart: ms / fps, musicEnd: (me + 1) / fps, rmsP90: percentile(musicRms, 0.9) || maxR,
+  };
+}
+
+// t (seconds) -> fractional analysis frame index
+const frameOf = (an, t) => (t - an.tOff) * an.fps;
+
+function envMax(an, arr, t, w = 0.03) {
+  const a = Math.max(0, Math.floor(frameOf(an, t - w))), b = Math.min(arr.length - 1, Math.ceil(frameOf(an, t + w)));
+  let m = 0; for (let i = a; i <= b; i++) if (arr[i] > m) m = arr[i];
+  return m;
+}
+
+function detectTempo(an, hint) {
+  const o = an.comb, n = o.length, fps = an.fps;
+  const maxLag = Math.ceil(fps * 60 / 50) * 2 + 4;
+  const acf = new Float64Array(maxLag + 1);
+  for (let l = 1; l <= maxLag; l++) { let s = 0; for (let i = 0; i + l < n; i++) s += o[i] * o[i + l]; acf[l] = s / (n - l); }
+  const A = l => interp(acf, l);
+  let lo = 60, hi = 230;
+  if (hint) { lo = hint * 0.97; hi = hint * 1.03; }
+  let best = { bpm: hint || 120, s: -1 };
+  for (let bpm = lo; bpm <= hi; bpm += 0.1) {
+    const l = fps * 60 / bpm;
+    let s = A(l) + 0.5 * A(2 * l) + 0.25 * A(0.5 * l) + 0.25 * A(4 * l);
+    if (!hint) { const z = Math.log2(bpm / 125); s *= Math.exp(-0.5 * z * z / 0.8); }
+    if (s > best.s) best = { bpm, s };
+  }
+  return best.bpm;
+}
+
+function onsetPeaks(an) {
+  const o = an.comb, out = [];
+  for (let i = 2; i < o.length - 2; i++) {
+    if (o[i] > 0.25 && o[i] >= o[i - 1] && o[i] > o[i + 1] && o[i] >= o[i - 2] && o[i] >= o[i + 2]) {
+      const a = o[i - 1], b = o[i], c = o[i + 1], d = a - 2 * b + c;
+      const u = d !== 0 ? 0.5 * (a - c) / d : 0;
+      out.push({ t: (i + u) / an.fps + an.tOff, s: b });
+    }
+  }
+  return out;
+}
+
+// Find the exact period + phase. Returns { bpm, firstBeat } where firstBeat is in [0, 60/bpm).
+function fitGrid(an, bpmGuess, span = 0.02) {
+  const o = an.comb, n = o.length, fps = an.fps;
+  const startF = Math.max(0, Math.floor(frameOf(an, an.musicStart))), endF = Math.min(n - 1, Math.ceil(frameOf(an, an.musicEnd)));
+  let best = { s: -1, bpm: bpmGuess, ph: 0 };
+  const step = bpmGuess * 0.0004;
+  for (let bpm = bpmGuess * (1 - span); bpm <= bpmGuess * (1 + span) + 1e-9; bpm += step) {
+    const P = fps * 60 / bpm;
+    for (let ph = 0; ph < P; ph += 0.5) {
+      let s = 0, c = 0;
+      for (let k = startF + ph; k < endF; k += P) { s += interp(o, k); c++; }
+      s /= Math.max(1, c);
+      if (s > best.s) best = { s, bpm, ph: startF + ph };
+    }
+  }
+  let P = 60 / best.bpm, t0 = best.ph / fps + an.tOff;
+  // refine with least squares on the strong onsets that sit near predicted beats
+  const peaks = onsetPeaks(an).filter(p => p.s > 0.45);
+  for (let iter = 0; iter < 3; iter++) {
+    const tol = Math.min(0.04, P * 0.12), pts = [];
+    for (const p of peaks) {
+      const k = Math.round((p.t - t0) / P), pred = t0 + k * P;
+      if (Math.abs(p.t - pred) < tol) pts.push([k, p.t]);
+    }
+    if (pts.length < 16) break;
+    let sk = 0, st = 0, skk = 0, skt = 0; const m = pts.length;
+    for (const [k, t] of pts) { sk += k; st += t; skk += k * k; skt += k * t; }
+    const den = m * skk - sk * sk; if (Math.abs(den) < 1e-9) break;
+    const nP = (m * skt - sk * st) / den, nt0 = (st - nP * sk) / m;
+    if (Math.abs(nP - P) / P > 0.006) break;
+    P = nP; t0 = nt0;
+  }
+  const firstBeat = ((t0 % P) + P) % P;
+  return { bpm: 60 / P, firstBeat };
+}
+
+function detectMeter(an, bpm, firstBeat, nameHint) {
+  const spb = 60 / bpm, res = {};
+  for (const m of [3, 4]) {
+    const sums = new Array(m).fill(0), cnt = new Array(m).fill(0);
+    for (let k = 0; firstBeat + k * spb < an.musicEnd; k++) {
+      const t = firstBeat + k * spb; if (t < an.musicStart) continue;
+      const v = envMax(an, an.env[0], t) + 0.5 * envMax(an, an.env[1], t);
+      sums[k % m] += v; cnt[k % m]++;
+    }
+    const avg = sums.map((s, i) => s / Math.max(1, cnt[i]));
+    const mean = avg.reduce((a, b) => a + b, 0) / m || 1;
+    let bi = 0; for (let i = 1; i < m; i++) if (avg[i] > avg[bi]) bi = i;
+    res[m] = { ratio: avg[bi] / mean, downbeat: bi };
+  }
+  let m = res[3].ratio > res[4].ratio * 1.08 ? 3 : 4;
+  if (/waltz/i.test(nameHint || '')) m = 3;
+  return { beatsPerBar: m, downbeat: res[m].downbeat };
+}
+
+function downbeatFor(an, bpm, firstBeat, m) {
+  const spb = 60 / bpm, sums = new Array(m).fill(0);
+  for (let k = 0; firstBeat + k * spb < an.musicEnd; k++) {
+    const t = firstBeat + k * spb; if (t < an.musicStart) continue;
+    sums[k % m] += envMax(an, an.env[0], t) + 0.5 * envMax(an, an.env[1], t);
+  }
+  let bi = 0; for (let i = 1; i < m; i++) if (sums[i] > sums[bi]) bi = i;
+  return bi;
+}
+
+// ---------------- map generation ----------------
+function chartWindow(an, p) {
+  const tStart = Math.max(p.minFirst, an.musicStart - 0.02);
+  const tEnd = Math.min(an.musicEnd, an.dur) - 0.5;
+  return { tStart, tEnd };
+}
+
+function generateMap(an, p) {
+  // p: { bpm, firstBeat, beatsPerBar, downbeat, difficulty, density, seed, minFirst }
+  const cfg = DIFF[p.difficulty], spb = 60 / p.bpm, slot = spb / 4, m = p.beatsPerBar;
+  const subs = cfg.subs.filter(j => (j % 2 === 0) || slot >= 0.12);
+  const rng = mulberry32(p.seed);
+  const { tStart, tEnd } = chartWindow(an, p);
+  const beatT = k => p.firstBeat + k * spb;
+  const notes = [];
+  const memory = [];
+  const st = { last: -1, prev: -1, lastT: -9, nextSide: 0 };
+  let barIdx = 0, lastChordBar = -9;
+  const firstBar = (((p.downbeat % m) + m) % m) - m;
+
+  for (let b = firstBar; beatT(b) < tEnd; b += m, barIdx++) {
+    const barStart = beatT(b), barEnd = beatT(b + m);
+    if (barEnd < tStart) continue;
+    // loudness of this bar
+    const ra = Math.max(0, Math.floor(barStart * an.fps)), rb = Math.min(an.rms.length, Math.ceil(barEnd * an.fps));
+    let e = 0; for (let i = ra; i < rb; i++) e += an.rms[i]; e = Math.min(1, (e / Math.max(1, rb - ra)) / an.rmsP90);
+    // candidate slots
+    const slots = [], vec = new Float32Array(m * 4);
+    for (let i = 0; i < m; i++) for (let j = 0; j < 4; j++) {
+      const t = beatT(b + i) + j * slot;
+      const low = envMax(an, an.env[0], t), mid = envMax(an, an.env[1], t), high = envMax(an, an.env[2], t);
+      const raw = Math.max(0.9 * low, 0.8 * mid, 0.6 * high) + 0.25 * (low + mid + high) / 3;
+      vec[i * 4 + j] = raw;
+      if (!subs.includes(j) || t < tStart || t > tEnd || raw < STRENGTH_FLOOR) continue;
+      const w = j === 0 ? (i === 0 ? 1.2 : 1.0) : j === 2 ? 0.7 : 0.5;
+      slots.push({ t, i, j, idx: i * 4 + j, low, mid, high, score: w * raw });
+    }
+    const quota = Math.round(cfg.nps * (barEnd - barStart) * (0.35 + 0.9 * e) * p.density);
+    slots.sort((a, c) => c.score - a.score);
+    const picked = [];
+    const prevNear = notes.filter(n => n.t > barStart - cfg.gap - 0.01).map(n => n.t);
+    for (const s of slots) {
+      if (picked.length >= quota) break;
+      if (prevNear.some(t => Math.abs(t - s.t) < cfg.gap - 1e-6)) continue;
+      if (picked.some(q => Math.abs(q.t - s.t) < cfg.gap - 1e-6)) continue;
+      picked.push(s);
+    }
+    picked.sort((a, c) => a.t - c.t);
+    if (!picked.length) continue;
+
+    // lanes: reuse the lanes of a matching earlier bar so repeated music feels learnable
+    const mask = picked.map(s => s.idx).join(',');
+    let lanes = null;
+    for (let k = memory.length - 1; k >= 0; k--) {
+      const mem = memory[k]; if (mem.mask !== mask) continue;
+      let dot = 0, na = 0, nb = 0;
+      for (let q = 0; q < vec.length; q++) { dot += vec[q] * mem.vec[q]; na += vec[q] * vec[q]; nb += mem.vec[q] * mem.vec[q]; }
+      if (dot / (Math.sqrt(na * nb) || 1) < 0.9) continue;
+      lanes = mem.lanes.slice();
+      if (mem.uses++ % 2 === 1) lanes = lanes.map(l => 2 - l);
+      if (lanes[0] === st.last && picked[0].t - st.lastT < 0.26) lanes = lanes.map(l => 2 - l);
+      if (lanes[0] === st.last && picked[0].t - st.lastT < 0.26) lanes = null;
+      break;
+    }
+    if (lanes) {
+      for (let q = 0; q < picked.length; q++) advance(st, lanes[q], picked[q].t);
+    } else {
+      lanes = picked.map(s => { const l = pickLane(s, st, rng); advance(st, l, s.t); return l; });
+      memory.push({ mask, vec, lanes: lanes.slice(), uses: 0 });
+      if (memory.length > 64) memory.shift();
+    }
+    picked.forEach((s, q) => {
+      notes.push({ t: s.t, lane: lanes[q] });
+      if (cfg.chords && s.j === 0 && s.low > 0.75 && s.mid > 0.5 && barIdx - lastChordBar >= 2 && rng() < 0.6) {
+        const other = lanes[q] === 1 ? (rng() < 0.5 ? 0 : 2) : 2 - lanes[q];
+        notes.push({ t: s.t, lane: other });
+        lastChordBar = barIdx;
+      }
+    });
+  }
+  notes.sort((a, c) => a.t - c.t || a.lane - c.lane);
+  return notes;
+}
+
+function pickLane(s, st, rng) {
+  const type = (s.low >= s.mid * 0.9 && s.low >= s.high) ? 'side' : (s.mid >= s.high ? 'center' : 'move');
+  const gap = s.t - st.lastT;
+  let best = -1e9, bl = 0;
+  for (let l = 0; l < LANES; l++) {
+    let v = rng() * 0.45;
+    if (type === 'side') v += (l !== 1 ? 1 : 0) + (l === st.nextSide ? 0.5 : 0);
+    else if (type === 'center') v += (l === 1 ? 1 : 0);
+    else v += (l !== st.last ? 0.6 : 0);
+    if (l === st.last) { v -= gap < 0.26 ? 2.2 : 0.5; if (l === st.prev) v -= 3; }
+    if (v > best) { best = v; bl = l; }
+  }
+  return bl;
+}
+function advance(st, l, t) { st.prev = st.last; st.last = l; st.lastT = t; if (l !== 1) st.nextSide = 2 - l; }
+
+function levelVars(an, p, notes) {
+  const spb = 60 / p.bpm, cfg = DIFF[p.difficulty];
+  const { tStart, tEnd } = chartWindow(an, p);
+  const firstHit = p.firstBeat + Math.ceil((tStart - p.firstBeat) / spb - 1e-6) * spb;
+  const beatStep = cfg.step(p.bpm);
+  const noteCount = Math.max(1, Math.floor((tEnd - firstHit) / (spb * beatStep)) + 1);
+  const pattern = [];
+  for (let i = 0; i < notes.length && pattern.length < 8; i++) if (i === 0 || notes[i].t !== notes[i - 1].t) pattern.push(notes[i].lane);
+  return { bpm: p.bpm, firstHit, beatStep, noteCount, pattern: pattern.length ? pattern : [0, 1, 2], offset: p.offset };
+}
+
+// ======================= app state =======================
+const S = {
+  name: '', buffer: null, an: null,
+  bpm: 120, firstBeat: 0, beatsPerBar: 4, downbeat: 0, offset: 0, minFirst: 2.0,
+  difficulty: 'normal', density: 1, seed: 1, bpmHint: null,
+  notes: [], sel: null, undo: [], redo: [],
+};
+const params = () => ({ bpm: S.bpm, firstBeat: S.firstBeat, beatsPerBar: S.beatsPerBar, downbeat: S.downbeat,
+  difficulty: S.difficulty, density: S.density, seed: S.seed, minFirst: S.minFirst, offset: S.offset });
+
+const $ = s => document.querySelector(s);
+let actx = null;
+const ac = () => (actx ||= new (window.AudioContext || window.webkitAudioContext)());
+function status(text, p) { $('#statusText').textContent = text; const pr = $('#prog'); pr.hidden = p == null; if (p != null) pr.value = p; }
+const tick = () => new Promise(r => setTimeout(r, 0));
+
+async function openSong(file) {
+  stop();
+  status('Decoding ' + file.name + '…', 0);
+  const buf = await ac().decodeAudioData(await file.arrayBuffer());
+  const n = buf.length, mono = new Float32Array(n);
+  for (let c = 0; c < buf.numberOfChannels; c++) { const d = buf.getChannelData(c); for (let i = 0; i < n; i++) mono[i] += d[i] / buf.numberOfChannels; }
+  S.name = file.name; S.buffer = buf;
+  $('#songName').textContent = file.name;
+  status('Listening to the song…', 0);
+  S.an = await analyze(mono, buf.sampleRate, async f => { status('Listening to the song…', f); await tick(); });
+  const base = file.name.replace(/\.[^.]+$/, '').trim().toLowerCase();
+  S.bpmHint = BPM_HINTS[base] || null;
+  status('Finding the beat…', 1); await tick();
+  const guess = detectTempo(S.an, S.bpmHint);
+  Object.assign(S, fitGrid(S.an, guess));
+  Object.assign(S, detectMeter(S.an, S.bpm, S.firstBeat, file.name));
+  S.offset = 0; S.sel = null; S.undo = []; S.redo = [];
+  $('#title').value = file.name.replace(/\.[^.]+$/, '').trim() + ' / ' + DIFF[S.difficulty].label;
+  $('#drop').classList.add('hidden'); $('#app').classList.remove('hidden'); $('#loadMapBtn').disabled = false;
+  view.start = 0; play.pos = 0;
+  regenerate(false);
+  syncInputs();
+  status(`Done: ${S.bpm.toFixed(2)} BPM${S.bpmHint ? ' (BPM.txt says ' + S.bpmHint + ')' : ''}, ${S.notes.length} arrows.`);
+}
+
+function snapshot() { return JSON.stringify({ notes: S.notes, bpm: S.bpm, firstBeat: S.firstBeat, beatsPerBar: S.beatsPerBar, downbeat: S.downbeat, offset: S.offset }); }
+function pushUndo() { S.undo.push(snapshot()); if (S.undo.length > 100) S.undo.shift(); S.redo = []; }
+function restore(s) { Object.assign(S, JSON.parse(s)); S.sel = null; syncInputs(); changed(); }
+
+function regenerate(undoable = true) {
+  if (!S.an) return;
+  if (undoable) pushUndo();
+  S.notes = generateMap(S.an, params());
+  S.sel = null;
+  changed();
+}
+
+function refit(bpm, span) {
+  pushUndo();
+  Object.assign(S, fitGrid(S.an, bpm, span));
+  S.downbeat = downbeatFor(S.an, S.bpm, S.firstBeat, S.beatsPerBar);
+  S.notes = generateMap(S.an, params());
+  syncInputs(); changed();
+}
+
+function syncInputs() {
+  $('#bpm').value = S.bpm.toFixed(2);
+  $('#meter').value = String(S.beatsPerBar);
+  $('#offset').value = S.offset.toFixed(3);
+  $('#minFirst').value = S.minFirst;
+  $('#diff').value = S.difficulty;
+}
+
+let outTimer = 0;
+function changed() {
+  clearTimeout(outTimer); outTimer = setTimeout(updateOutputs, 60);
+}
+
+function fmt(v, d = 3) { return (Math.round(v * 10 ** d) / 10 ** d).toFixed(d).replace(/0+$/, '').replace(/\.$/, '.0'); }
+
+function updateOutputs() {
+  if (!S.an) return;
+  const v = levelVars(S.an, params(), S.notes);
+  const an = S.an, dur = Math.max(0.1, (S.notes.at(-1)?.t ?? 0) - (S.notes[0]?.t ?? 0));
+  const rows = [
+    ['bpm', fmt(v.bpm, 2), `Measured from the audio${S.bpmHint ? ` (BPM.txt: ${S.bpmHint})` : ''}.`],
+    ['first_hit', fmt(v.firstHit) + ' s', `First on-beat time at or after ${fmt(S.minFirst, 2)} s and after the music starts.`],
+    ['offset', fmt(v.offset) + ' s', 'Arrow times come from the audio, so 0 is right unless the play test says you hit early or late.'],
+    ['note_count', String(v.noteCount), `Formula fallback: beats from first_hit to the end of the music (step ${v.beatStep}).`],
+    ['beat_step', fmt(v.beatStep, 2), 'Formula fallback spacing, in beats.'],
+    ['pattern', '[' + v.pattern.join(', ') + ']', 'Formula fallback: the first lanes of the real map.'],
+    ['notes', String(S.notes.length), `${(S.notes.length / dur).toFixed(2)} arrows per second on average.`],
+    ['first beat', fmt(S.firstBeat) + ' s', `Beat grid start. Bars of ${S.beatsPerBar}, bar starts on beat ${S.downbeat + 1}.`],
+    ['music', `${fmt(an.musicStart, 2)}–${fmt(an.musicEnd, 2)} s`, `Song file is ${fmt(an.dur, 2)} s. Last arrow at ${fmt(S.notes.at(-1)?.t ?? 0, 2)} s.`],
+  ];
+  $('#vars').innerHTML = rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join('');
+  $('#out').value = levelText(v);
+}
+
+function gdFloat(x, d = 3) { const s = fmt(x, d); return s.includes('.') ? s : s + '.0'; }
+
+function levelText(v) {
+  const title = $('#title').value || S.name;
+  const notes = S.notes.map(n => `[${gdFloat(n.t)}, ${n.lane}]`);
+  const lines = [];
+  for (let i = 0; i < notes.length; i += 8) lines.push('\t\t\t' + notes.slice(i, i + 8).join(', '));
+  return `\t{
+\t\t"title": ${JSON.stringify(title)},
+\t\t"description": "${Math.round(v.bpm)} bpm · ${DIFF[S.difficulty].label}",
+\t\t"stream": preload("res://assets/music/${S.name}"),
+\t\t"bpm": ${gdFloat(v.bpm, 2)}, "first_hit": ${gdFloat(v.firstHit)}, "offset": ${gdFloat(v.offset)},
+\t\t"note_count": ${v.noteCount}, "beat_step": ${gdFloat(v.beatStep, 2)},
+\t\t"pattern": [${v.pattern.join(', ')}],
+\t\t"notes": [
+${lines.join(',\n')}
+\t\t]
+\t},`;
+}
+
+function mapJSON() {
+  const v = levelVars(S.an, params(), S.notes);
+  return JSON.stringify({
+    format: 'revolution-beatmap/1', song: S.name, stream: 'res://assets/music/' + S.name, title: $('#title').value,
+    difficulty: S.difficulty, bpm: +v.bpm.toFixed(4), first_beat: +S.firstBeat.toFixed(4), beats_per_bar: S.beatsPerBar,
+    downbeat: S.downbeat, first_hit: +v.firstHit.toFixed(4), offset: S.offset, note_count: v.noteCount, beat_step: v.beatStep,
+    pattern: v.pattern, min_first: S.minFirst, notes: S.notes.map(n => [+n.t.toFixed(4), n.lane]),
+  }, null, 1);
+}
+
+function loadMap(text) {
+  const j = JSON.parse(text);
+  if (!Array.isArray(j.notes)) throw new Error('No notes in that file.');
+  pushUndo();
+  if (j.song && j.song !== S.name) status(`Note: this map was made for "${j.song}", but "${S.name}" is open.`);
+  Object.assign(S, {
+    bpm: j.bpm ?? S.bpm, firstBeat: j.first_beat ?? S.firstBeat, beatsPerBar: j.beats_per_bar ?? S.beatsPerBar,
+    downbeat: j.downbeat ?? S.downbeat, offset: j.offset ?? 0, minFirst: j.min_first ?? S.minFirst,
+    difficulty: DIFF[j.difficulty] ? j.difficulty : S.difficulty,
+    notes: j.notes.map(([t, lane]) => ({ t: +t, lane: Math.max(0, Math.min(2, lane | 0)) })).sort((a, b) => a.t - b.t),
+  });
+  if (j.title) $('#title').value = j.title;
+  S.sel = null; syncInputs(); changed();
+}
+
+// ======================= playback =======================
+const play = { src: null, playing: false, ctxStart: 0, from: 0, pos: 0, sched: 0, timer: 0, test: false, judged: null, stats: null, flash: null };
+
+function audioTime() { return play.playing ? actx.currentTime - play.ctxStart + play.from : play.pos; }
+function heardTime() { return play.playing ? audioTime() - (actx.outputLatency || actx.baseLatency || 0) : play.pos; }
+function gameTime() { return heardTime() + S.offset; }
+
+function start(from) {
+  if (!S.buffer) return;
+  stop(true);
+  const ctx = ac(); ctx.resume();
+  from = Math.max(0, Math.min(from, S.buffer.duration - 0.05));
+  const src = ctx.createBufferSource(); src.buffer = S.buffer; src.connect(ctx.destination);
+  play.ctxStart = ctx.currentTime + 0.06; play.from = from; src.start(play.ctxStart, from);
+  src.onended = () => { if (play.src === src) { play.pos = audioTime(); play.playing = false; play.src = null; clearInterval(play.timer); finishTest(); updateButtons(); } };
+  play.src = src; play.playing = true;
+  play.sched = from;
+  play.timer = setInterval(scheduleClicks, 25);
+  if (play.test) { play.judged = new Set(); play.stats = { perfect: 0, good: 0, miss: 0, errs: [], combo: 0 }; play.missPtr = 0; }
+  updateButtons();
+}
+function stop(keepPos) {
+  if (play.src) { const s = play.src; play.src = null; try { s.stop(); } catch (e) {} }
+  if (play.playing) play.pos = keepPos === true ? audioTime() : play.pos;
+  play.playing = false; clearInterval(play.timer);
+  finishTest();
+  updateButtons();
+}
+function toggle() { if (play.playing) { play.pos = audioTime(); stop(); } else start(play.pos); }
+
+function scheduleClicks() {
+  if (!play.playing || !$('#clicks').checked || play.test) { if (play.playing) play.sched = audioTime() + 0.15; return; }
+  const until = audioTime() + 0.15, ctx = actx;
+  const done = new Set();
+  for (const n of S.notes) {
+    if (n.t < play.sched || n.t >= until) continue;
+    if (done.has(n.t)) continue; done.add(n.t);
+    const when = play.ctxStart + (n.t - play.from);
+    if (when < ctx.currentTime) continue;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = 'triangle'; o.frequency.value = [1400, 1900, 1650][n.lane];
+    g.gain.setValueAtTime(0.0001, when); g.gain.exponentialRampToValueAtTime(0.35, when + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+    o.connect(g); g.connect(ctx.destination); o.start(when); o.stop(when + 0.06);
+  }
+  play.sched = Math.max(play.sched, until);
+}
+
+function updateButtons() {
+  $('#playBtn').textContent = play.playing ? '❚❚ Pause' : '▶ Play';
+  $('#testBtn').classList.toggle('on', play.test);
+}
+
+// ---- play test ----
+function judge(lane) {
+  const gt = gameTime(); let best = -1, bd = 1e9;
+  S.notes.forEach((n, i) => { if (n.lane !== lane || play.judged.has(i)) return; const d = Math.abs(gt - n.t); if (d <= GAME.GOOD && d < bd) { bd = d; best = i; } });
+  if (best < 0) return;
+  play.judged.add(best);
+  const err = gt - S.notes[best].t, st = play.stats;
+  st.errs.push(err);
+  if (bd <= GAME.PERFECT) { st.perfect++; play.flash = { text: 'Perfect', color: '#ffe066', lane, at: performance.now() }; }
+  else { st.good++; play.flash = { text: 'Good', color: '#66e0ff', lane, at: performance.now() }; }
+  st.combo++;
+}
+function checkMisses() {
+  if (!play.test || !play.playing || !play.stats) return;
+  const gt = gameTime();
+  for (let i = 0; i < S.notes.length; i++) {
+    const n = S.notes[i]; if (n.t > gt - GAME.GOOD) break;
+    if (n.t < play.from || play.judged.has(i)) continue;
+    play.judged.add(i); play.stats.miss++; play.stats.combo = 0;
+    play.flash = { text: 'Miss', color: '#ff6b7f', lane: n.lane, at: performance.now() };
+  }
+}
+function testSummary() {
+  const st = play.stats; if (!st) return '';
+  const n = st.errs.length, mean = n ? st.errs.reduce((a, b) => a + b, 0) / n : 0;
+  let s = `Perfect ${st.perfect} · Good ${st.good} · Miss ${st.miss} · Combo ${st.combo}`;
+  if (n >= 8) {
+    s += `\nYou hit ${Math.abs(mean * 1000).toFixed(0)} ms ${mean > 0 ? 'late' : 'early'} on average → suggested offset ${(S.offset - mean).toFixed(3)}`;
+    play.suggest = S.offset - mean;
+  } else s += '\nHit at least 8 arrows to get an offset suggestion.';
+  return s;
+}
+function finishTest() {
+  if (play.stats) { $('#testStats').textContent = testSummary(); $('#applyOffsetBtn').hidden = play.suggest == null; }
+}
+
+// ======================= timeline =======================
+const tl = $('#timeline'), tctx = tl.getContext('2d');
+const view = { start: 0, pps: 140 };
+const TL = { ruler: 18, wave: 64, laneH: 60 };
+let drag = null, hover = null;
+
+function tlSize() {
+  const dpr = window.devicePixelRatio || 1, r = tl.getBoundingClientRect();
+  const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  if (tl.width !== w || tl.height !== h) { tl.width = w; tl.height = h; }
+  tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { W: r.width, H: r.height };
+}
+const xOf = t => (t - view.start) * view.pps;
+const tOf = x => view.start + x / view.pps;
+const laneTop = l => TL.ruler + TL.wave + l * TL.laneH;
+
+function snapT(t) {
+  const d = +$('#snap').value; if (!d) return t;
+  const step = 60 / S.bpm / d; return S.firstBeat + Math.round((t - S.firstBeat) / step) * step;
+}
+
+function drawTimeline() {
+  if (!S.an) return;
+  const { W, H } = tlSize(), an = S.an, spb = 60 / S.bpm, m = S.beatsPerBar;
+  const c = tctx;
+  c.clearRect(0, 0, W, H);
+  const t0 = view.start, t1 = tOf(W);
+  // lanes background
+  for (let l = 0; l < LANES; l++) { c.fillStyle = l % 2 ? '#14161f' : '#111219'; c.fillRect(0, laneTop(l), W, TL.laneH); }
+  // early zone (arrow would not fall from the top)
+  const ez = xOf(Math.min(S.minFirst, GAME.LEAD_TIME));
+  if (ez > 0) { c.fillStyle = 'rgba(255,107,127,.08)'; c.fillRect(0, TL.ruler, Math.min(W, ez), H - TL.ruler); }
+  // grid
+  const kA = Math.floor((t0 - S.firstBeat) / spb) - 1, kB = Math.ceil((t1 - S.firstBeat) / spb) + 1;
+  const showSub = view.pps * spb / 4 > 9;
+  c.font = '11px Consolas, monospace'; c.textBaseline = 'top';
+  for (let k = kA; k <= kB; k++) {
+    const t = S.firstBeat + k * spb, x = xOf(t);
+    const isBar = (((k - S.downbeat) % m) + m) % m === 0;
+    if (view.pps * spb < 4 && !isBar) continue;
+    c.fillStyle = isBar ? '#4a4f6a' : '#2a2e3f';
+    c.fillRect(Math.round(x), TL.ruler, 1, H - TL.ruler);
+    if (isBar && view.pps * spb * m > 28) { c.fillStyle = '#8a8fa8'; c.fillText(String(Math.floor((k - S.downbeat) / m) + 1), x + 3, 3); }
+    if (showSub) { c.fillStyle = '#1d2030'; for (let j = 1; j < 4; j++) c.fillRect(Math.round(x + j * view.pps * spb / 4), TL.ruler + TL.wave, 1, LANES * TL.laneH); }
+  }
+  // waveform
+  const mid = TL.ruler + TL.wave / 2, amp = TL.wave / 2 - 3;
+  c.fillStyle = '#6c63c9';
+  for (let px = 0; px < W; px++) {
+    const a = Math.max(0, Math.floor(tOf(px) * an.fps)), b = Math.min(an.wave.length, Math.max(a + 1, Math.floor(tOf(px + 1) * an.fps)));
+    let mx = 0; for (let i = a; i < b; i++) if (an.wave[i] > mx) mx = an.wave[i];
+    const h = Math.max(1, mx * amp); c.fillRect(px, mid - h, 1, h * 2);
+  }
+  // markers
+  const v = levelVars(an, params(), S.notes);
+  const mark = (t, color, label) => { const x = xOf(t); if (x < -50 || x > W + 50) return; c.fillStyle = color; c.fillRect(Math.round(x), TL.ruler, 2, TL.wave); c.fillText(label, x + 4, TL.ruler + 2); };
+  mark(an.musicStart, '#5ee6a0', 'music');
+  mark(v.firstHit, '#ffb86b', 'first_hit');
+  mark(an.musicEnd, '#ff6b7f', 'end');
+  // lane labels
+  c.font = 'bold 18px system-ui'; c.textBaseline = 'middle';
+  // notes
+  const r = Math.min(16, TL.laneH / 2 - 6);
+  S.notes.forEach((n, i) => {
+    const x = xOf(n.t); if (x < -20 || x > W + 20) return;
+    const y = laneTop(n.lane) + TL.laneH / 2;
+    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2);
+    c.fillStyle = LANE_COLOR[n.lane]; c.globalAlpha = 0.9; c.fill(); c.globalAlpha = 1;
+    if (S.sel === n) { c.lineWidth = 3; c.strokeStyle = '#fff'; c.stroke(); }
+    else if (hover === n) { c.lineWidth = 2; c.strokeStyle = '#ffffffaa'; c.stroke(); }
+    c.fillStyle = '#111'; c.textAlign = 'center'; c.fillText(LANE_GLYPH[n.lane], x, y + 1); c.textAlign = 'left';
+  });
+  for (let l = 0; l < LANES; l++) { c.fillStyle = LANE_COLOR[l]; c.globalAlpha = .55; c.fillText(LANE_GLYPH[l], 6, laneTop(l) + TL.laneH / 2); c.globalAlpha = 1; }
+  // playhead
+  const px = xOf(play.playing ? heardTime() : play.pos);
+  c.fillStyle = '#fff'; c.fillRect(Math.round(px), 0, 2, H);
+  // ruler bg line
+  c.fillStyle = '#2f3345'; c.fillRect(0, TL.ruler - 1, W, 1);
+}
+
+function noteAt(x, y) {
+  const lane = Math.floor((y - TL.ruler - TL.wave) / TL.laneH);
+  if (lane < 0 || lane >= LANES) return null;
+  let best = null, bd = 12;
+  for (const n of S.notes) { if (n.lane !== lane) continue; const d = Math.abs(xOf(n.t) - x); if (d < bd) { bd = d; best = n; } }
+  return best;
+}
+function mousePos(e) { const r = tl.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+function sortNotes() { S.notes.sort((a, b) => a.t - b.t || a.lane - b.lane); }
+
+tl.addEventListener('mousedown', e => {
+  if (!S.an || e.button !== 0) return;
+  const { x, y } = mousePos(e);
+  if (y < TL.ruler + TL.wave) { // seek
+    const t = Math.max(0, tOf(x));
+    if (play.playing) start(t); else play.pos = t;
+    drag = { seek: true }; return;
+  }
+  const lane = Math.floor((y - TL.ruler - TL.wave) / TL.laneH);
+  if (lane < 0 || lane >= LANES) return;
+  let n = noteAt(x, y);
+  pushUndo();
+  if (!n) {
+    const t = Math.max(0, snapT(tOf(x)));
+    if (S.notes.some(q => q.lane === lane && Math.abs(q.t - t) < 0.01)) { S.undo.pop(); return; }
+    n = { t, lane }; S.notes.push(n); sortNotes(); changed();
+  }
+  S.sel = n; drag = { note: n, moved: false };
+});
+window.addEventListener('mousemove', e => {
+  if (!S.an) return;
+  const { x, y } = mousePos(e);
+  if (drag?.seek) { const t = Math.max(0, tOf(x)); if (!play.playing) play.pos = t; return; }
+  if (drag?.note) {
+    const n = drag.note;
+    n.t = Math.max(0, snapT(tOf(x)));
+    n.lane = Math.max(0, Math.min(LANES - 1, Math.floor((y - TL.ruler - TL.wave) / TL.laneH)));
+    drag.moved = true; changed(); return;
+  }
+  if (e.target === tl) hover = noteAt(x, y);
+});
+window.addEventListener('mouseup', () => {
+  if (drag?.note) { sortNotes(); changed(); }
+  if (drag?.seek && play.playing) { /* already restarted */ }
+  drag = null;
+});
+tl.addEventListener('contextmenu', e => {
+  e.preventDefault(); const { x, y } = mousePos(e); const n = noteAt(x, y);
+  if (n) { pushUndo(); S.notes.splice(S.notes.indexOf(n), 1); if (S.sel === n) S.sel = null; hover = null; changed(); }
+});
+tl.addEventListener('wheel', e => {
+  if (!S.an) return; e.preventDefault();
+  const { x } = mousePos(e);
+  if (e.ctrlKey) {
+    const t = tOf(x); view.pps = Math.max(15, Math.min(600, view.pps * Math.exp(-e.deltaY * 0.0015)));
+    view.start = t - x / view.pps; $('#zoom').value = view.pps;
+  } else view.start += (e.deltaY + e.deltaX) / view.pps * 0.8;
+  clampView();
+}, { passive: false });
+
+function clampView() {
+  const W = tl.getBoundingClientRect().width, maxStart = Math.max(0, S.an.dur - W / view.pps + 0.5);
+  view.start = Math.max(0, Math.min(maxStart, view.start));
+  $('#scroll').value = maxStart ? Math.round(view.start / maxStart * 1000) : 0;
+}
+
+// ======================= preview =======================
+const pv = $('#preview'), pctx = pv.getContext('2d');
+function drawPreview() {
+  const dpr = window.devicePixelRatio || 1, r = pv.getBoundingClientRect();
+  if (pv.width !== Math.round(r.width * dpr)) { pv.width = Math.round(r.width * dpr); pv.height = Math.round(r.height * dpr); }
+  const W = r.width, H = r.height, c = pctx; c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, W, H);
+  const scale = H / GAME.VIEW_H, hitY = GAME.HIT_Y * scale, laneX = [W * 0.28, W * 0.5, W * 0.72];
+  const gt = play.playing ? gameTime() : play.pos + S.offset;
+  // beat flash
+  const spb = 60 / S.bpm, ph = (((gt - S.firstBeat) % spb) + spb) % spb / spb;
+  c.fillStyle = `rgba(139,123,255,${0.10 * (1 - ph)})`; c.fillRect(0, 0, W, H);
+  const size = 30 * scale * 1.4;
+  c.font = `bold ${size}px system-ui`; c.textAlign = 'center'; c.textBaseline = 'middle';
+  for (let l = 0; l < LANES; l++) { c.globalAlpha = 0.35; c.fillStyle = LANE_COLOR[l]; c.fillText(LANE_GLYPH[l], laneX[l], hitY); c.globalAlpha = 1;
+    c.strokeStyle = '#ffffff22'; c.lineWidth = 2; c.strokeRect(laneX[l] - size * 0.6, hitY - size * 0.6, size * 1.2, size * 1.2); }
+  for (let i = 0; i < S.notes.length; i++) {
+    const n = S.notes[i], dt = n.t - gt;
+    if (dt > GAME.LEAD_TIME) break;
+    if (dt < -GAME.GOOD) continue;
+    if (play.test && play.judged?.has(i)) continue;
+    const y = hitY - dt * GAME.FALL * scale;
+    c.fillStyle = LANE_COLOR[n.lane]; c.fillText(LANE_GLYPH[n.lane], laneX[n.lane], y);
+  }
+  const f = play.flash;
+  if (f && performance.now() - f.at < 450) {
+    const a = 1 - (performance.now() - f.at) / 450;
+    c.globalAlpha = a; c.fillStyle = f.color; c.font = `bold ${22 * scale * 1.3}px system-ui`;
+    c.fillText(f.text, laneX[f.lane], hitY - 60 * scale); c.globalAlpha = 1;
+  }
+  c.textAlign = 'left';
+}
+
+// ======================= loop =======================
+function frame() {
+  if (S.an) {
+    if (play.playing) {
+      const t = heardTime(), W = tl.getBoundingClientRect().width;
+      if (!drag && (xOf(t) > W * 0.8 || xOf(t) < 0)) { view.start = t - W * 0.2 / view.pps; clampView(); }
+      checkMisses();
+      if (play.test && play.stats) $('#testStats').textContent = testSummary();
+    }
+    drawTimeline(); drawPreview();
+    const t = play.playing ? heardTime() : play.pos;
+    const bar = Math.floor((t - S.firstBeat) / (60 / S.bpm) - S.downbeat) / S.beatsPerBar;
+    $('#timeText').textContent = `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')} · bar ${Math.max(1, Math.floor(bar) + 1)}`;
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ======================= wiring =======================
+$('#openBtn').onclick = () => $('#fileIn').click();
+$('#fileIn').onchange = e => { const f = e.target.files[0]; if (f) openSong(f).catch(err => status('Could not read that file: ' + err.message)); e.target.value = ''; };
+$('#loadMapBtn').onclick = () => $('#mapIn').click();
+$('#mapIn').onchange = async e => { const f = e.target.files[0]; if (f) { try { loadMap(await f.text()); } catch (err) { status('Bad map file: ' + err.message); } } e.target.value = ''; };
+const drop = $('#drop');
+['dragenter', 'dragover'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('hot'); }));
+['dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('hot'); }));
+document.addEventListener('drop', e => {
+  const f = e.dataTransfer.files[0]; if (!f) return;
+  if (/\.json$/i.test(f.name)) { if (S.an) f.text().then(loadMap).catch(err => status('Bad map file: ' + err.message)); else status('Open the song first, then load its map.'); }
+  else openSong(f).catch(err => status('Could not read that file: ' + err.message));
+});
+
+$('#diff').onchange = e => { S.difficulty = e.target.value; const t = $('#title'); t.value = t.value.replace(/\/ (Easy|Normal|Hard)$/, '/ ' + DIFF[S.difficulty].label); regenerate(); };
+$('#density').oninput = e => { S.density = +e.target.value; $('#densityVal').textContent = S.density.toFixed(2) + '×'; };
+$('#density').onchange = () => regenerate();
+$('#regenBtn').onclick = () => { S.seed = (Math.random() * 1e9) | 0; regenerate(); };
+$('#bpm').onchange = e => { const b = +e.target.value; if (b >= 40 && b <= 300) refit(b, 0.003); };
+$('#halfBtn').onclick = () => refit(S.bpm / 2, 0.003);
+$('#dblBtn').onclick = () => refit(S.bpm * 2, 0.003);
+$('#meter').onchange = e => { pushUndo(); S.beatsPerBar = +e.target.value; S.downbeat = downbeatFor(S.an, S.bpm, S.firstBeat, S.beatsPerBar); S.notes = generateMap(S.an, params()); changed(); };
+$('#shiftBtn').onclick = () => { pushUndo(); S.downbeat = (S.downbeat + 1) % S.beatsPerBar; S.notes = generateMap(S.an, params()); changed(); };
+$('#minFirst').onchange = e => { S.minFirst = Math.max(0, +e.target.value || 0); regenerate(); };
+$('#offset').onchange = e => { S.offset = +e.target.value || 0; changed(); };
+$('#title').oninput = changed;
+$('#playBtn').onclick = toggle;
+$('#stopBtn').onclick = () => { stop(); play.pos = 0; view.start = 0; clampView(); };
+$('#testBtn').onclick = () => {
+  play.test = !play.test; play.suggest = null; $('#applyOffsetBtn').hidden = true;
+  $('#testStats').textContent = play.test ? 'Press Play, then hit ← ↑ → as arrows reach the targets.' : '';
+  if (play.playing) start(audioTime()); updateButtons();
+};
+$('#applyOffsetBtn').onclick = () => { if (play.suggest != null) { pushUndo(); S.offset = +play.suggest.toFixed(3); syncInputs(); changed(); $('#applyOffsetBtn').hidden = true; } };
+$('#zoom').oninput = e => { const W = tl.getBoundingClientRect().width, c = view.start + W / 2 / view.pps; view.pps = +e.target.value; view.start = c - W / 2 / view.pps; clampView(); };
+$('#scroll').oninput = e => { const W = tl.getBoundingClientRect().width, maxStart = Math.max(0, S.an.dur - W / view.pps + 0.5); view.start = maxStart * e.target.value / 1000; };
+$('#copyBtn').onclick = async () => { const t = $('#out').value; try { await navigator.clipboard.writeText(t); } catch { $('#out').select(); document.execCommand('copy'); } status('Level entry copied. Paste it into LEVELS in main.gd.'); };
+$('#saveBtn').onclick = () => {
+  const blob = new Blob([mapJSON()], { type: 'application/json' }), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = S.name.replace(/\.[^.]+$/, '').trim().toLowerCase().replace(/\W+/g, '_') + '_' + S.difficulty + '.json';
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+document.addEventListener('keydown', e => {
+  if (!S.an) return;
+  const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName) && document.activeElement.type !== 'range' && document.activeElement.type !== 'checkbox';
+  if (play.test && play.playing && ['ArrowLeft', 'ArrowUp', 'ArrowRight'].includes(e.key)) {
+    e.preventDefault(); if (!e.repeat) judge({ ArrowLeft: 0, ArrowUp: 1, ArrowRight: 2 }[e.key]); return;
+  }
+  if (typing) return;
+  if (e.code === 'Space') { e.preventDefault(); toggle(); }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && S.sel) { pushUndo(); S.notes.splice(S.notes.indexOf(S.sel), 1); S.sel = null; changed(); }
+  else if (e.ctrlKey && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); if (S.undo.length) { S.redo.push(snapshot()); restore(S.undo.pop()); } }
+  else if (e.ctrlKey && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); if (S.redo.length) { S.undo.push(snapshot()); restore(S.redo.pop()); } }
+});
+window.addEventListener('resize', () => S.an && clampView());
+
+// test hook: ?test=<url of an mp3> (needs --allow-file-access-from-files)
+(async () => {
+  const q = new URLSearchParams(location.search).get('test'); if (!q) return;
+  const res = await fetch(q); const blob = await res.blob();
+  const f = new File([blob], decodeURIComponent(q.split('/').pop()));
+  const t0 = performance.now(); await openSong(f);
+  document.title = 'TEST ' + JSON.stringify({ ms: Math.round(performance.now() - t0), bpm: +S.bpm.toFixed(3), firstBeat: +S.firstBeat.toFixed(3), meter: S.beatsPerBar, notes: S.notes.length, vars: levelVars(S.an, params(), S.notes), music: [S.an.musicStart, S.an.musicEnd] });
+})().catch(e => document.title = 'TESTERR ' + e.message);
+</script>
+</body>
+</html>

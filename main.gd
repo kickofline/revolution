@@ -82,6 +82,10 @@ func _on_level_selected(index: int) -> void:
 
 func _build_chart(level: Dictionary) -> void:
 	chart.clear()
+	if level.has("notes"):
+		for n in level["notes"]:
+			chart.append({"time": float(n[0]), "lane": int(n[1])})
+		return
 	var seconds_per_beat: float = 60.0 / float(level["bpm"])
 	var pattern: Array = level["pattern"]
 	for i in range(int(level["note_count"])):

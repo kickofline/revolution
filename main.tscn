@@ -92,7 +92,7 @@ horizontal_alignment = 1
 
 [node name="Subtitle" type="Label" parent="MenuLayer/FrontEnd/StartPanel/Content" unique_id=166665782]
 layout_mode = 2
-text = "Hit Left, Up, or Right when an arrow reaches its target."
+text = "subtitle"
 horizontal_alignment = 1
 autowrap_mode = 3
 
