@@ -110,7 +110,7 @@ func _spawn_label(
 	var label: Label = Label.new()
 	var judgment: String = "Perfect" if perfect else "Good"
 	var font_size: int = 24 if perfect else 21
-	label.text = "%s  |  Combo %d" % [judgment, combo]
+	label.text = "%s" % [judgment]
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.size = Vector2(240.0, 42.0)

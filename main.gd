@@ -11,14 +11,33 @@ const GOOD_WINDOW: float = 0.150
 # Seconds the song keeps playing (fading out) after the last beat.
 const END_PAD: float = 1.5
 
+# The player character on the left. Side faces right, so flip it for left.
+const PLAYER_CHARACTER: Dictionary = {
+	"name": "Dance King",
+	"idle": [preload("res://assets/character_assets/DanceKing/DanceKingNeutral-1.png.png")],
+	"left": preload("res://assets/character_assets/DanceKing/DanceKingSide-1.png.png"),
+	"up": preload("res://assets/character_assets/DanceKing/DanceKingUp-1.png.png"),
+	"right": preload("res://assets/character_assets/DanceKing/DanceKingSide-1.png.png"),
+	"miss": preload("res://assets/character_assets/DanceKing/DanceKingDown-1.png.png"),
+	"flip_left": true
+}
+
 
 const LEVELS: Array[Dictionary] = [
 	{
 		"title": "Newer Wave / Normal",
-		"description": "110 bpm · Normal",
+		"description": "110 bpm · Normal - vs Secret Service",
+		"opponent": {
+			"name": "Secret Service",
+			"idle": [
+				preload("res://assets/character_assets/SecretService/SecretServiceDance-1.png.png"),
+				preload("res://assets/character_assets/SecretService/SecretServiceDance-2.png.png"),
+				preload("res://assets/character_assets/SecretService/SecretServiceDance-4.png.png")
+			]
+		},
 		"stream": preload("res://assets/music/Newer Wave.mp3"),
 		"bpm": 110.0, "first_hit": 2.2, "offset": 0.0,
-		"note_count": 312, "beat_step": 1.0,
+		"note_count": 312, "beat_step": 1.0, "max_beats": 64,
 		"pattern": [0, 1, 0, 2, 0, 2, 1, 0],
 		"notes": [
 			[2.2, 0], [2.746, 1], [3.291, 0], [3.564, 2], [3.837, 0], [4.382, 2], [4.928, 1], [5.473, 0],
@@ -70,7 +89,12 @@ const LEVELS: Array[Dictionary] = [
 	},
 	{
 		"title": "Neon Laser Horizon / Normal",
-		"description": "160 bpm · Normal",
+		"description": "160 bpm · Normal - vs VP Greeley",
+		"opponent": {
+			"name": "VP Greeley",
+			"idle": [preload("res://assets/character_assets/VPGreeley-1.png.png")],
+			"flip_idle": true
+		},
 		"stream": preload("res://assets/music/Neon Laser Horizon.mp3"),
 		"bpm": 160.0, "first_hit": 2.27, "offset": 0.012,
 		"note_count": 64, "beat_step": 1.0, "max_beats": 64,
@@ -134,10 +158,15 @@ const LEVELS: Array[Dictionary] = [
 	},
 	{
 		"title": "Realizer / Normal",
-		"description": "125 bpm · Normal",
+		"description": "125 bpm · Normal - vs Obamna",
+		"opponent": {
+			"name": "Obamna",
+			"sheet": preload("res://assets/character_assets/Obamna.png"),
+			"hframes": 3, "vframes": 2, "frame_count": 4
+		},
 		"stream": preload("res://assets/music/Realizer.mp3"),
 		"bpm": 125.0, "first_hit": 2.422, "offset": 0.0,
-		"note_count": 636, "beat_step": 1.0,
+		"note_count": 636, "beat_step": 1.0, "max_beats": 128,
 		"pattern": [1, 2, 0, 1, 2, 1, 1, 2],
 		"notes": [
 			[2.182, 1], [2.422, 2], [2.662, 0], [2.902, 1], [3.622, 2], [3.862, 1], [4.342, 1], [4.822, 2],
@@ -231,6 +260,8 @@ const LEVELS: Array[Dictionary] = [
 @onready var receptors: Node2D = $Receptors
 @onready var front_end: RhythmFrontEnd = $MenuLayer/FrontEnd
 @onready var hit_fx: RhythmFeedback = $Feedback
+@onready var player_dancer: RhythmDancer = $Player
+@onready var opponent_dancer: RhythmDancer = $Opponent
 
 var chart: Array[Dictionary] = []
 var notes: Array[RhythmNote] = []
@@ -249,6 +280,7 @@ var goods: int = 0
 var feedback: String = ""
 var end_time: float = 0.0
 var base_volume_db: float = 0.0
+var dance_beat: int = 0
 
 
 func _ready() -> void:
@@ -258,6 +290,7 @@ func _ready() -> void:
 	front_end.retry_requested.connect(_start_run)
 	front_end.menu_requested.connect(_show_menu)
 	front_end.set_levels(LEVELS)
+	player_dancer.set_character(PLAYER_CHARACTER)
 	_show_menu()
 
 
@@ -266,6 +299,7 @@ func _on_level_selected(index: int) -> void:
 	var level: Dictionary = LEVELS[index]
 	music.stream = level["stream"] as AudioStream
 	timing_offset = float(level["offset"])
+	opponent_dancer.set_character(level["opponent"])
 	_build_chart(level)
 	_start_run()
 
@@ -306,6 +340,7 @@ func _show_menu() -> void:
 	hit_fx.reset()
 	receptors.hide()
 	hud.hide()
+	_hide_dancers()
 	active_level = -1
 	front_end.show_start()
 
@@ -329,6 +364,11 @@ func _start_run() -> void:
 	front_end.hide()
 	receptors.show()
 	hud.show()
+	player_dancer.reset()
+	opponent_dancer.reset()
+	player_dancer.show()
+	opponent_dancer.show()
+	dance_beat = _beat_at(song_time)
 	start_usec = Time.get_ticks_usec()
 	music.volume_db = base_volume_db
 	running = true
@@ -351,6 +391,7 @@ func _process(_delta: float) -> void:
 	if not running:
 		return
 	_update_clock()
+	_update_beat()
 	# Fade the music out over the last END_PAD seconds.
 	if song_time > end_time - END_PAD:
 		var fade: float = clampf((end_time - song_time) / END_PAD, 0.001, 1.0)
@@ -375,6 +416,7 @@ func _process(_delta: float) -> void:
 		if song_time - note.hit_time > GOOD_WINDOW:
 			notes.remove_at(i)
 			hit_fx.play_miss(note.lane)
+			player_dancer.stumble()
 			note.queue_free()
 			misses += 1
 			combo = 0
@@ -398,6 +440,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	for lane in range(ACTIONS.size()):
 		if event.is_action_pressed(ACTIONS[lane]):
+			player_dancer.pose(lane)
 			_judge(lane)
 			get_viewport().set_input_as_handled()
 			return
@@ -435,8 +478,32 @@ func _judge(lane: int) -> void:
 	_check_complete()
 
 
+func _beat_at(time: float) -> int:
+	var level: Dictionary = LEVELS[active_level]
+	var seconds_per_beat: float = 60.0 / float(level["bpm"])
+	return floori((time - float(level["first_hit"])) / seconds_per_beat)
+
+
+func _update_beat() -> void:
+	# Both dancers move once per beat of the active song.
+	var beat: int = _beat_at(song_time)
+	if beat == dance_beat:
+		return
+	dance_beat = beat
+	player_dancer.on_beat()
+	opponent_dancer.on_beat()
+
+
+func _hide_dancers() -> void:
+	player_dancer.reset()
+	opponent_dancer.reset()
+	player_dancer.hide()
+	opponent_dancer.hide()
+
+
 func _refresh_hud() -> void:
-	var title: String = String(LEVELS[active_level]["title"])
+	var level: Dictionary = LEVELS[active_level]
+	var title: String = "%s  vs %s" % [String(level["title"]), String(level["opponent"]["name"])]
 	hud.text = "%s\nScore: %d   Combo: %d   Best: %d   Misses: %d\n%s" % [
 		title, score, combo, best_combo, misses, feedback
 	]
@@ -454,6 +521,7 @@ func _finish_run(status: String) -> void:
 	hit_fx.reset()
 	receptors.hide()
 	hud.hide()
+	_hide_dancers()
 	var title: String = String(LEVELS[active_level]["title"])
 	var summary: String = "%s\n%s\nScore: %d\nPerfect: %d   Good: %d   Miss: %d\nBest combo: %d" % [
 		title, status, score, perfects, goods, misses, best_combo
@@ -467,4 +535,4 @@ func _on_music_finished() -> void:
 	if next_note == chart.size() and notes.is_empty():
 		_finish_run("Chart complete")
 	else:
-		_finish_run("Audio ended early - adjust the song or chart length")
+		_finish_run("Audio ended early")

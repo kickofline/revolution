@@ -7,9 +7,18 @@
 [ext_resource type="AudioStream" uid="uid://dhdshxeanggin" path="res://assets/music/Newer Wave.mp3" id="5_lquwl"]
 [ext_resource type="Script" uid="uid://2aijkgxpua0v" path="res://front_end.gd" id="6_7mycd"]
 [ext_resource type="Script" uid="uid://boqdd6p2ie824" path="res://feedback.gd" id="7_272bh"]
+[ext_resource type="Texture2D" uid="uid://bnlmw8bkyjy60" path="res://assets/WhiteHouse-1.png.png" id="8_5vw27"]
+[ext_resource type="Script" uid="uid://c7iuiprg5xafn" path="res://dancer.gd" id="9_kek77"]
 
 [node name="Main" type="Node2D" unique_id=1161704820]
 script = ExtResource("1_1bvp3")
+
+[node name="Background" type="Sprite2D" parent="." unique_id=695099417]
+z_index = -10
+texture_filter = 1
+scale = Vector2(5, 5)
+texture = ExtResource("8_5vw27")
+centered = false
 
 [node name="Receptors" type="Node2D" parent="." unique_id=869917042]
 
@@ -39,6 +48,8 @@ offset_left = 24.0
 offset_top = 24.0
 offset_right = 764.0
 offset_bottom = 149.0
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 8
 theme_override_font_sizes/font_size = 20
 text = "Score: 0"
 
@@ -87,7 +98,7 @@ alignment = 1
 
 [node name="Title" type="Label" parent="MenuLayer/FrontEnd/StartPanel/Content" unique_id=751142744]
 layout_mode = 2
-text = "game name"
+text = "Dance Revolution Revolution"
 horizontal_alignment = 1
 
 [node name="Subtitle" type="Label" parent="MenuLayer/FrontEnd/StartPanel/Content" unique_id=166665782]
@@ -193,3 +204,19 @@ text = "Main menu"
 [node name="Feedback" type="Node2D" parent="." unique_id=2003996119]
 z_index = 20
 script = ExtResource("7_272bh")
+
+[node name="Player" type="Node2D" parent="." unique_id=1895743381]
+position = Vector2(105, 470)
+script = ExtResource("9_kek77")
+
+[node name="Sprite" type="Sprite2D" parent="Player" unique_id=783944742]
+texture_filter = 1
+scale = Vector2(3, 3)
+
+[node name="Opponent" type="Node2D" parent="." unique_id=1892955950]
+position = Vector2(695, 470)
+script = ExtResource("9_kek77")
+
+[node name="Sprite" type="Sprite2D" parent="Opponent" unique_id=135713396]
+texture_filter = 1
+scale = Vector2(3, 3)
