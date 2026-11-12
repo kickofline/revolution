@@ -86,14 +86,6 @@ const LEVELS: Array[Dictionary] = [
 		]
 	},
 	{
-		"title": "3 - Neon Laser Horizon / Rush",
-		"description": "160 BPM",
-		"stream": preload("res://assets/music/Neon Laser Horizon.mp3"),
-		"bpm": 160.0, "first_hit": 2.0, "offset": -0.25,
-		"note_count": 64, "beat_step": 1,
-		"pattern": [0, 1, 2, 1, 2, 0, 2, 1]
-	},
-	{
 		"title": "Realizer / Normal",
 		"description": "125 bpm · Normal",
 		"stream": preload("res://assets/music/Realizer.mp3"),
